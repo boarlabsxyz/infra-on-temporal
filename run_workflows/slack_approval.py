@@ -11,7 +11,7 @@ async def main():
         "PollSlackForReactionWorkflow",
         "C09R8GCL2K1", 
         id="slack-monitor-1",
-        task_queue="translator-task-queue",
+        task_queue="multi-task-queue",
     )
 
     print("Workflow started:", result)

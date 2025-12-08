@@ -1,0 +1,91 @@
+version: "3.9"
+
+services:
+  postgresql:
+    container_name: temporal-postgresql
+    image: postgres:14
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  temporal:
+    container_name: temporal
+    build:
+      context: .
+      dockerfile: Dockerfile.temporal
+    restart: unless-stopped
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      POSTGRES_SEEDS: postgresql
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      DB_PORT: 5432
+      TEMPORAL_PORT: 7233
+    ports:
+      - "7233:7233"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "tctl", "--address", "temporal:7233", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  temporal-ui:
+    container_name: temporal-ui
+    image: temporalio/ui:latest
+    depends_on:
+      temporal:
+        condition: service_healthy
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+    ports:
+      - "8080:8080"
+    networks:
+      - app-network
+
+  worker:
+    container_name: temporal-worker
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    restart: unless-stopped
+    depends_on:
+      temporal:
+        condition: service_healthy
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+
+      SLACK_TOKEN: ${SLACK_TOKEN}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      TG_API_ID: ${TG_API_ID}
+      TG_API_HASH: ${TG_API_HASH}
+    volumes:
+      - .:/app
+    networks:
+      - app-network
+    command: python worker.py
+
+volumes:
+  postgresql-data:
+
+networks:
+  app-network:
+    driver: bridge

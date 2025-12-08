@@ -1,1 +1,5 @@
 temporalio
+python-dotenv
+telethon
+slack-sdk
+aiohttp

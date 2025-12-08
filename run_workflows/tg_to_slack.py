@@ -10,7 +10,7 @@ async def main():
         "TelegramMonitorWorkflow",
         ["dmytrogorin", "automation_remarks_ua", "xpinjection_channel"],               # channel list
         id="tg-monitor-1",
-        task_queue="telegram-monitor",
+        task_queue="multi-task-queue",
     )
 
     print("Workflow started:", result)

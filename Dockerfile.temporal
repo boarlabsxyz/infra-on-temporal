@@ -1,0 +1,23 @@
+FROM temporalio/auto-setup:1.27.2
+
+# Set build arguments and environment variables
+ARG HOST=temporal
+ARG POSTGRES_SEEDS=postgresql
+ARG POSTGRES_USER=temporal
+ARG POSTGRES_DB_TEMPORAL_VISIBILITY=temporal_visibility
+ARG DB_PORT=5432
+ARG TEMPORAL_PORT=7233
+
+ENV POSTGRES_SEEDS=$POSTGRES_SEEDS \
+    POSTGRES_USER=$POSTGRES_USER \
+    POSTGRES_DB_TEMPORAL_VISIBILITY=$POSTGRES_DB_TEMPORAL_VISIBILITY \
+    DB_PORT=$DB_PORT \
+    TEMPORAL_PORT=$TEMPORAL_PORT
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \
+  CMD sh -c "tctl --address temporal:7233 cluster health"
+
+USER temporal
+
+# Expose the gRPC port
+EXPOSE 7233
