@@ -8,7 +8,7 @@ from activities.slack_approval_activities.resend_message import resend_message
 @workflow.defn
 class PollSlackForReactionWorkflow:
     def __init__(self):
-        self.processed = set()     # ✅ store processed message timestamps
+        self.resent = set()
 
     @workflow.run
     async def run(self, channel_id: str):
@@ -22,8 +22,8 @@ class PollSlackForReactionWorkflow:
 
             for ts in timestamps:
 
-                # ✅ Skip duplicates
-                if ts in self.processed:
+                # Skip messages already resent
+                if ts in self.resent:
                     continue
 
                 info = await workflow.execute_activity(
@@ -32,18 +32,24 @@ class PollSlackForReactionWorkflow:
                     schedule_to_close_timeout=timedelta(seconds=10),
                 )
 
-                # ✅ Immediately mark as processed
-                self.processed.add(ts)
+                # Check if message has the reaction
+                has_checkmark = any(
+                    r.get("name") == "white_check_mark"
+                    for r in info.get("reactions", [])
+                )
 
-                if info.get("reactions"):
-                    if any(r.get("name") == "white_check_mark" for r in info["reactions"]):
-                        await workflow.execute_activity(
-                            resend_message,
-                            info["text"],
-                            schedule_to_close_timeout=timedelta(seconds=10),
-                        )
+                if has_checkmark:
+                    await workflow.execute_activity(
+                        resend_message,
+                        info["text"],
+                        schedule_to_close_timeout=timedelta(seconds=10),
+                    )
+
+                    # SAVE ONLY timestamps that were actually resent
+                    self.resent.add(ts)
 
                 workflow.logger.info(f"Checked message {ts}: {info}")
 
             workflow.logger.info(f"Got {len(timestamps)} timestamps")
             await workflow.sleep(timedelta(minutes=1))
+

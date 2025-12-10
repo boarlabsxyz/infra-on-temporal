@@ -8,8 +8,7 @@ from activities.telegram_to_slack_activities.send_message_to_slack import send_m
 @workflow.defn
 class TelegramMonitorWorkflow:
     def __init__(self):
-        # Workflow persistent state:
-        self.last_ids = {}   # {"channel_name": last_message_id}
+        self.last_ids = {}
 
     @workflow.run
     async def run(self, channel_list: list[str]):
@@ -29,23 +28,24 @@ class TelegramMonitorWorkflow:
                     self.last_ids[channel] = latest
 
                     for msg in new_msgs:
-                        if len(msg['text']) > 0:
-                            translated = await workflow.execute_activity(
-                                get_claude_answer_activity,
-                                msg["text"],
-                                schedule_to_close_timeout=timedelta(seconds=180),
-                            )
+                        if len(msg['text']) == 0:
+                            continue
 
-                            workflow.logger.info(
-                                f"Translated by Claude:\n{translated}"
-                            )
+                        translated = await workflow.execute_activity(
+                            get_claude_answer_activity,
+                            msg["text"],
+                            schedule_to_close_timeout=timedelta(seconds=180),
+                        )
+
+                        workflow.logger.info(
+                            f"Translated by Claude:\n{translated}"
+                        )
 
                         await workflow.execute_activity(
                             send_message_to_slack,
                             translated,
                             schedule_to_close_timeout=timedelta(seconds=30),
                         )
-
 
                 workflow.logger.info(
                     f"{channel}: {len(new_msgs)} new messages"

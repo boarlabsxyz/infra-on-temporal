@@ -4,3 +4,4 @@ env
 __pycache__
 .mypy_cache
 .DS_Store
+.dockerignore

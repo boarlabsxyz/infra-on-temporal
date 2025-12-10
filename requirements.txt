@@ -3,3 +3,4 @@ python-dotenv
 telethon
 slack-sdk
 aiohttp
+anthropic
