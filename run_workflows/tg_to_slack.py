@@ -8,7 +8,7 @@ async def main():
 
     result = await client.start_workflow(
         "TelegramMonitorWorkflow",
-        ["dmytrogorin", "automation_remarks_ua", "xpinjection_channel"],               # channel list
+        ["dmytrogorin", "automation_remarks_ua", "xpinjection_channel"],               # channel list "dmytrogorin", "automation_remarks_ua", "xpinjection_channel", "jlowapiktest"
         id="tg-monitor-1",
         task_queue="multi-task-queue",
     )

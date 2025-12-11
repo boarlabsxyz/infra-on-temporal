@@ -4,7 +4,7 @@ from temporalio.client import Client
 from temporalio.worker import Worker
 
 from workflows.telegram_to_slack_workflow import TelegramMonitorWorkflow
-from activities.telegram_to_slack_activities.telegram_get_messeges import fetch_channel_messages
+from activities.telegram_to_slack_activities.telegram_get_messeges import fetch_last_message
 from activities.telegram_to_slack_activities.claude_translate import get_claude_answer_activity
 from activities.telegram_to_slack_activities.send_message_to_slack import send_message_to_slack
 
@@ -23,7 +23,7 @@ async def main():
         client,
         task_queue="multi-task-queue",
         workflows=[TelegramMonitorWorkflow, PollSlackForReactionWorkflow],
-        activities=[fetch_channel_messages, get_claude_answer_activity, send_message_to_slack, get_messages, check_reactions, resend_message],
+        activities=[fetch_last_message, get_claude_answer_activity, send_message_to_slack, get_messages, check_reactions, resend_message],
     )
 
     print("Worker started")
