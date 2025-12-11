@@ -12,7 +12,7 @@ client = WebClient(token=os.getenv("SLACK_TOKEN"))
 async def get_messages(channel_id: str) -> List[str]:
     res = client.conversations_history(
         channel=channel_id,
-        limit=50
+        limit=10
     )
     print(res)
 

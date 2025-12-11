@@ -10,8 +10,7 @@ API_HASH = os.getenv("TG_API_HASH")
 
 
 @activity.defn
-async def fetch_last_message(parameters: list):
-    channel_username = parameters[0]
+async def fetch_last_message(channel_username):
 
     client = TelegramClient("tg_session", API_ID, API_HASH)
     await client.connect()

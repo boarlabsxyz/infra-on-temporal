@@ -18,7 +18,7 @@ class TelegramMonitorWorkflow:
 
                 last_msg = await workflow.execute_activity(
                     fetch_last_message,
-                    [channel],
+                    channel,
                     schedule_to_close_timeout=timedelta(seconds=30),
                 )
 
@@ -38,7 +38,7 @@ class TelegramMonitorWorkflow:
 
                 await workflow.execute_activity(
                     send_message_to_slack,
-                    translated,
+                    [translated, channel],
                     schedule_to_close_timeout=timedelta(seconds=30),
                 )
 
