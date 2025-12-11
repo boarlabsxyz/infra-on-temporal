@@ -7,27 +7,26 @@ load_dotenv()
 API_ID = os.getenv("TG_API_ID")
 API_HASH = os.getenv("TG_API_HASH")
 
-
 @activity.defn
-async def fetch_channel_messages(parametrs: list):
-    channel_username = parametrs[0]
-    last_message_id = parametrs[1]
+async def fetch_channel_messages(params: list):
+    channel_username, last_message_id = params
 
+    async with TelegramClient("tg_session", API_ID, API_HASH) as client:
+        entity = await client.get_entity(channel_username)
 
-    client = TelegramClient("tg_session", API_ID, API_HASH)
-    await client.connect()
+        new_messages = []
 
-    entity = await client.get_entity(channel_username)
-    messages = []
+        async for msg in client.iter_messages(entity, limit=5):
+            if msg.id <= last_message_id:
+                break
 
-    async for msg in client.iter_messages(entity, limit=1):
-        if msg.id <= last_message_id:
-            break
-        messages.append({
-            "id": msg.id,
-            "date": msg.date.isoformat(),
-            "text": msg.text or "",
-        })
+            new_messages.append({
+                "id": msg.id,
+                "date": msg.date.isoformat(),
+                "text": msg.text or "",
+            })
 
-    await client.disconnect()
-    return messages
+        # возвращаем сообщения в хронологическом порядке
+        new_messages.reverse()
+
+        return new_messages
