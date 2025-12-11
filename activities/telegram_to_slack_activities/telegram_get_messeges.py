@@ -18,7 +18,6 @@ async def fetch_last_message(parameters: list):
 
     entity = await client.get_entity(channel_username)
 
-    # Берём только последнее сообщение
     async for msg in client.iter_messages(entity, limit=1):
         last_msg = {
             "id": msg.id,

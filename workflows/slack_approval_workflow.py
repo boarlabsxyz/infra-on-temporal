@@ -21,8 +21,6 @@ class PollSlackForReactionWorkflow:
             )
 
             for ts in timestamps:
-
-                # Skip messages already resent
                 if ts in self.resent:
                     continue
 
@@ -32,7 +30,6 @@ class PollSlackForReactionWorkflow:
                     schedule_to_close_timeout=timedelta(seconds=10),
                 )
 
-                # Check if message has the reaction
                 has_checkmark = any(
                     r.get("name") == "white_check_mark"
                     for r in info.get("reactions", [])
@@ -45,7 +42,6 @@ class PollSlackForReactionWorkflow:
                         schedule_to_close_timeout=timedelta(seconds=10),
                     )
 
-                    # SAVE ONLY timestamps that were actually resent
                     self.resent.add(ts)
 
                 workflow.logger.info(f"Checked message {ts}: {info}")

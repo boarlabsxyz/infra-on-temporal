@@ -27,11 +27,9 @@ class TelegramMonitorWorkflow:
 
                 msg_id = last_msg["id"]
 
-                # Уже отправляли → пропускаем
                 if msg_id == last_saved_id:
                     continue
 
-                # Новое сообщение → отправляем
                 translated = await workflow.execute_activity(
                     get_claude_answer_activity,
                     last_msg["text"],
@@ -44,7 +42,6 @@ class TelegramMonitorWorkflow:
                     schedule_to_close_timeout=timedelta(seconds=30),
                 )
 
-                # Запоминаем отправленный ID
                 self.last_ids[channel] = msg_id
 
                 workflow.logger.info(
