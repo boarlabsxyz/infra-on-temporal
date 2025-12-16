@@ -1,5 +1,7 @@
 from temporalio import workflow
 from datetime import timedelta
+from typing import List, Optional
+
 from activities.slack_approval_activities.get_messages import get_messages
 from activities.slack_approval_activities.get_reactions import check_reactions
 from activities.slack_approval_activities.resend_message import resend_message
@@ -7,11 +9,11 @@ from activities.slack_approval_activities.resend_message import resend_message
 
 @workflow.defn
 class PollSlackForReactionWorkflow:
-    def __init__(self):
-        self.resent = set()
 
     @workflow.run
-    async def run(self, channel_id: str):
+    async def run(self, channel_id: str, resent: Optional[List[str]] = None, started_at: Optional[float] = None,):
+        resent = resent or []
+        started_at = started_at or workflow.now().timestamp()
 
         while True:
             timestamps = await workflow.execute_activity(
@@ -21,7 +23,7 @@ class PollSlackForReactionWorkflow:
             )
 
             for ts in timestamps:
-                if ts in self.resent:
+                if ts in resent:
                     continue
 
                 info = await workflow.execute_activity(
@@ -42,10 +44,19 @@ class PollSlackForReactionWorkflow:
                         schedule_to_close_timeout=timedelta(seconds=10),
                     )
 
-                    self.resent.add(ts)
+                    resent.append(ts)
 
-                workflow.logger.info(f"Checked message {ts}: {info}")
+                    if len(resent) > 50:
+                        resent = resent[-20:]
 
-            workflow.logger.info(f"Got {len(timestamps)} timestamps")
+                workflow.logger.info(f"Checked message {ts}")
+
+            # 🔹 Continue-as-new to reset history
+            if workflow.now().timestamp() - started_at >= 24 * 60 * 60:
+                await workflow.continue_as_new(
+                    channel_id,
+                    resent,
+                    workflow.now().timestamp(),
+                )
+
             await workflow.sleep(timedelta(minutes=1))
-
