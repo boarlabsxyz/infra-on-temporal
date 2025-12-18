@@ -11,9 +11,10 @@ from activities.telegram_to_slack_activities.send_message_to_slack import send_m
 class TelegramMonitorWorkflow:
 
     @workflow.run
-    async def run(self, channel_list: list[str], last_ids: Optional[Dict[str, int]] = None, started_at: Optional[float] = None):
-        last_ids = last_ids or {}
-        started_at = started_at or workflow.now().timestamp()
+    async def run(self, pollstate):
+        channel_list = pollstate[0]
+        last_ids = pollstate[1]
+        started_at = pollstate[2]
 
         while True:
             for channel in channel_list:
@@ -51,11 +52,11 @@ class TelegramMonitorWorkflow:
                     f"Sent new message from {channel}: ID={msg_id}"
                 )
 
-            if workflow.now().timestamp() - started_at >= 12 * 60 * 60:
+            if workflow.now().timestamp() - started_at >= 6 * 60 * 60:
                 await workflow.continue_as_new(
-                    channel_list,
+                    [channel_list,
                     last_ids,
-                    workflow.now().timestamp(),
+                    workflow.now().timestamp()],
                 )
 
             await workflow.sleep(timedelta(minutes=1))

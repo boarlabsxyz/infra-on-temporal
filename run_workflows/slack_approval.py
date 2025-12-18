@@ -1,6 +1,7 @@
 # run_workflow.py
 import asyncio
 from temporalio.client import Client
+import time
 
 
 async def main():
@@ -9,7 +10,7 @@ async def main():
 
     result = await client.start_workflow(
         "PollSlackForReactionWorkflow",
-        "C09R8GCL2K1", 
+        ["C09R8GCL2K1", [], time.time()],
         id="slack-monitor-1",
         task_queue="multi-task-queue",
     )

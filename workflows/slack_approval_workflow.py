@@ -11,9 +11,10 @@ from activities.slack_approval_activities.resend_message import resend_message
 class PollSlackForReactionWorkflow:
 
     @workflow.run
-    async def run(self, channel_id: str, resent: Optional[List[str]] = None, started_at: Optional[float] = None,):
-        resent = resent or []
-        started_at = started_at or workflow.now().timestamp()
+    async def run(self, pollstate):
+        channel_id = pollstate[0]
+        resent = pollstate[1]
+        started_at = pollstate[2]
 
         while True:
             timestamps = await workflow.execute_activity(
@@ -51,12 +52,11 @@ class PollSlackForReactionWorkflow:
 
                 workflow.logger.info(f"Checked message {ts}")
 
-            # 🔹 Continue-as-new to reset history
-            if workflow.now().timestamp() - started_at >= 24 * 60 * 60:
+            if workflow.now().timestamp() - started_at >= 6 * 60 * 60:
                 await workflow.continue_as_new(
-                    channel_id,
+                    [channel_id,
                     resent,
-                    workflow.now().timestamp(),
+                    workflow.now().timestamp(),]
                 )
 
             await workflow.sleep(timedelta(minutes=1))
