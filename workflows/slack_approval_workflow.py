@@ -1,4 +1,5 @@
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 from datetime import timedelta
 from typing import List, Optional
 
@@ -21,7 +22,7 @@ class PollSlackForReactionWorkflow:
                 get_messages,
                 channel_id,
                 schedule_to_close_timeout=timedelta(seconds=60),
-                retry_policy=workflow.RetryPolicy(maximum_attempts=5),
+                retry_policy=RetryPolicy(maximum_attempts=5),
             )
 
             for ts in timestamps:
@@ -32,7 +33,7 @@ class PollSlackForReactionWorkflow:
                     check_reactions,
                     [ts, channel_id],
                     schedule_to_close_timeout=timedelta(seconds=60),
-                    retry_policy=workflow.RetryPolicy(maximum_attempts=5),
+                    retry_policy=RetryPolicy(maximum_attempts=5),
                 )
 
                 has_checkmark = any(
@@ -45,7 +46,7 @@ class PollSlackForReactionWorkflow:
                         resend_message,
                         info["text"],
                         schedule_to_close_timeout=timedelta(seconds=60),
-                        retry_policy=workflow.RetryPolicy(maximum_attempts=5),
+                        retry_policy=RetryPolicy(maximum_attempts=5),
                     )
 
                     resent.append(ts)

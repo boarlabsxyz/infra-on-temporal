@@ -1,5 +1,6 @@
 from datetime import timedelta
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 from typing import Dict, Optional
 
 from activities.telegram_to_slack_activities.telegram_get_messeges import fetch_last_message
@@ -24,7 +25,7 @@ class TelegramMonitorWorkflow:
                     fetch_last_message,
                     channel,
                     schedule_to_close_timeout=timedelta(seconds=30),
-                    retry_policy=workflow.RetryPolicy(maximum_attempts=5),
+                    retry_policy=RetryPolicy(maximum_attempts=5),
                 )
 
                 if not last_msg or len(last_msg["text"]) == 0:
@@ -39,14 +40,14 @@ class TelegramMonitorWorkflow:
                     get_claude_answer_activity,
                     last_msg["text"],
                     schedule_to_close_timeout=timedelta(seconds=180),
-                    retry_policy=workflow.RetryPolicy(maximum_attempts=5),
+                    retry_policy=RetryPolicy(maximum_attempts=5),
                 )
 
                 await workflow.execute_activity(
                     send_message_to_slack,
                     [translated, channel],
                     schedule_to_close_timeout=timedelta(seconds=30),
-                    retry_policy=workflow.RetryPolicy(maximum_attempts=5),
+                    retry_policy=RetryPolicy(maximum_attempts=5),
                 )
 
                 last_ids[channel] = msg_id
