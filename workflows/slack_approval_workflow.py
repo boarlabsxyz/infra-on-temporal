@@ -20,7 +20,8 @@ class PollSlackForReactionWorkflow:
             timestamps = await workflow.execute_activity(
                 get_messages,
                 channel_id,
-                schedule_to_close_timeout=timedelta(seconds=10),
+                schedule_to_close_timeout=timedelta(seconds=60),
+                retry_policy=workflow.RetryPolicy(maximum_attempts=5),
             )
 
             for ts in timestamps:
@@ -30,7 +31,8 @@ class PollSlackForReactionWorkflow:
                 info = await workflow.execute_activity(
                     check_reactions,
                     [ts, channel_id],
-                    schedule_to_close_timeout=timedelta(seconds=10),
+                    schedule_to_close_timeout=timedelta(seconds=60),
+                    retry_policy=workflow.RetryPolicy(maximum_attempts=5),
                 )
 
                 has_checkmark = any(
@@ -42,7 +44,8 @@ class PollSlackForReactionWorkflow:
                     await workflow.execute_activity(
                         resend_message,
                         info["text"],
-                        schedule_to_close_timeout=timedelta(seconds=10),
+                        schedule_to_close_timeout=timedelta(seconds=60),
+                        retry_policy=workflow.RetryPolicy(maximum_attempts=5),
                     )
 
                     resent.append(ts)
@@ -56,7 +59,7 @@ class PollSlackForReactionWorkflow:
                 await workflow.continue_as_new(
                     [channel_id,
                     resent,
-                    workflow.now().timestamp(),]
+                    workflow.now().timestamp()]
                 )
 
-            await workflow.sleep(timedelta(minutes=1))
+            await workflow.sleep(timedelta(minutes=5))
