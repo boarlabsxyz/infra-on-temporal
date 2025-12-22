@@ -28,7 +28,7 @@ class TelegramMonitorWorkflow:
                     retry_policy=RetryPolicy(maximum_attempts=5),
                 )
 
-                if not last_msg or len(last_msg["text"]) == 0:
+                if not last_msg or (len(last_msg["text"]) == 0 and not last_msg.get("has_image", False)):
                     continue
 
                 msg_id = last_msg["id"]
@@ -45,7 +45,7 @@ class TelegramMonitorWorkflow:
 
                 await workflow.execute_activity(
                     send_message_to_slack,
-                    [translated, channel],
+                    [translated, channel, last_msg.get("has_image", False), last_msg.get("image_data")],
                     schedule_to_close_timeout=timedelta(seconds=30),
                     retry_policy=RetryPolicy(maximum_attempts=5),
                 )

@@ -6,3 +6,4 @@ __pycache__
 .DS_Store
 .dockerignore
 tg_session.session
+IMAGE_SUPPORT_README.md

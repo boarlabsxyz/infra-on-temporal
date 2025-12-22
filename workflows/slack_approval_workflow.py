@@ -42,9 +42,16 @@ class PollSlackForReactionWorkflow:
                 )
 
                 if has_checkmark:
+                    # Prepare message info with image data if available
+                    message_info = {
+                        "text": info["text"],
+                        "has_image": info.get("has_image", False),
+                        "image_data": info.get("image_data")
+                    }
+                    
                     await workflow.execute_activity(
                         resend_message,
-                        info["text"],
+                        message_info,
                         schedule_to_close_timeout=timedelta(seconds=60),
                         retry_policy=RetryPolicy(maximum_attempts=5),
                     )
