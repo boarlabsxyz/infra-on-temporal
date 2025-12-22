@@ -31,6 +31,21 @@ async def check_reactions(info):
 
     msg_with_reactions = react_res.get("message", {})
     
+    # Extract text - handle both plain text and Block Kit messages
+    message_text = msg_with_reactions.get("text", "")
+    
+    # If text is empty or looks like a fallback, try to extract from blocks
+    if not message_text or message_text.startswith("New message from"):
+        blocks = msg_with_reactions.get("blocks", [])
+        for block in blocks:
+            if block.get("type") == "section":
+                text_obj = block.get("text", {})
+                if text_obj.get("type") in ["mrkdwn", "plain_text"]:
+                    extracted_text = text_obj.get("text", "")
+                    if extracted_text and not extracted_text.startswith("New message from"):
+                        message_text = extracted_text
+                        break
+    
     # Check for files/images in the message
     files = msg_with_reactions.get("files", [])
     has_image = False
@@ -60,7 +75,7 @@ async def check_reactions(info):
 
     return {
         "ts": ts,
-        "text": msg_with_reactions.get("text", ""),
+        "text": message_text,
         "user": msg_with_reactions.get("user", None),
         "reactions": msg_with_reactions.get("reactions", []),
         "has_image": has_image,
