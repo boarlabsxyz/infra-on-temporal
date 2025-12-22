@@ -45,7 +45,7 @@ class TelegramMonitorWorkflow:
 
                 await workflow.execute_activity(
                     send_message_to_slack,
-                    [translated, channel, last_msg.get("has_image", False), last_msg.get("image_data")],
+                    [translated, channel, last_msg.get("has_image", False), last_msg.get("image_data"), msg_id, last_msg["text"]],
                     schedule_to_close_timeout=timedelta(seconds=30),
                     retry_policy=RetryPolicy(maximum_attempts=5),
                 )
