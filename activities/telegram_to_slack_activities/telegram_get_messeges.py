@@ -1,5 +1,5 @@
 from telethon import TelegramClient
-from telethon.errors import TelegramError
+from telethon.errors import RPCError
 from temporalio import activity
 from typing import List, Dict, Any
 import os
@@ -82,7 +82,7 @@ async def fetch_last_message(channel_username: str, limit: int = 10) -> List[Dic
         activity.logger.info(f"Returning {len(messages_oldest_first)} messages in chronological order")
         return messages_oldest_first
         
-    except TelegramError as e:
+    except RPCError as e:
         activity.logger.error(f"Telegram API error: {str(e)}")
         raise
     except Exception as e:
