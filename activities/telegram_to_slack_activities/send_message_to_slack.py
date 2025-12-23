@@ -97,6 +97,8 @@ async def send_message_to_slack(info):
             # Post main message with link
             payload = {
                 "channel": SLACK_CHANNEL_ID,
+                "unfurl_links": False,  # Disable automatic link previews
+                "unfurl_media": False,  # Disable automatic media previews
                 "blocks": [
                     {
                         "type": "header",

@@ -43,18 +43,25 @@ class TelegramMonitorWorkflow:
                     retry_policy=RetryPolicy(maximum_attempts=5),
                 )
 
-                await workflow.execute_activity(
-                    send_message_to_slack,
-                    [translated, channel, last_msg.get("has_image", False), last_msg.get("image_data"), msg_id, last_msg["text"]],
-                    schedule_to_close_timeout=timedelta(seconds=30),
-                    retry_policy=RetryPolicy(maximum_attempts=5),
-                )
+                # If translated is empty, the message was filtered out as inappropriate or off-topic
+                if translated and translated.strip():
+                    await workflow.execute_activity(
+                        send_message_to_slack,
+                        [translated, channel, last_msg.get("has_image", False), last_msg.get("image_data"), msg_id, last_msg["text"]],
+                        schedule_to_close_timeout=timedelta(seconds=30),
+                        retry_policy=RetryPolicy(maximum_attempts=5),
+                    )
 
+                    workflow.logger.info(
+                        f"Sent new message from {channel}: ID={msg_id}"
+                    )
+                else:
+                    workflow.logger.info(
+                        f"Message from {channel} (ID={msg_id}) was filtered out as inappropriate or off-topic"
+                    )
+
+                # Update last_ids regardless of whether message was sent to avoid reprocessing
                 last_ids[channel] = msg_id
-
-                workflow.logger.info(
-                    f"Sent new message from {channel}: ID={msg_id}"
-                )
 
             if workflow.now().timestamp() - started_at >= 6 * 60 * 60:
                 await workflow.continue_as_new(
