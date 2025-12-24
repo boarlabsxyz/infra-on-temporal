@@ -63,7 +63,7 @@ class PollSlackForReactionWorkflow:
 
                 workflow.logger.info(f"Checked message {ts}")
 
-            if workflow.now().timestamp() - started_at >= 6 * 60 * 60:
+            if workflow.now().timestamp() - started_at >= 60 * 60:
                 await workflow.continue_as_new(
                     [channel_id,
                     resent,

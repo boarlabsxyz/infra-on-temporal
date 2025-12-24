@@ -25,7 +25,7 @@ class TelegramMonitorWorkflow:
                 messages = await workflow.execute_activity(
                     fetch_last_message,
                     channel,
-                    schedule_to_close_timeout=timedelta(seconds=30),
+                    schedule_to_close_timeout=timedelta(seconds=90),
                     retry_policy=RetryPolicy(maximum_attempts=5),
                 )
 
@@ -74,7 +74,9 @@ class TelegramMonitorWorkflow:
                     # Update last_ids after processing each message
                     last_ids[channel] = msg_id
 
-            if workflow.now().timestamp() - started_at >= 6 * 60 * 60:
+            # Continue as new after 30 minutes to prevent history size from exceeding limit
+            # This resets the workflow history while preserving state
+            if workflow.now().timestamp() - started_at >= 30 * 60:
                 await workflow.continue_as_new(
                     [channel_list,
                     last_ids,
