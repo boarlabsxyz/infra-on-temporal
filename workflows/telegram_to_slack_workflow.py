@@ -83,4 +83,4 @@ class TelegramMonitorWorkflow:
                     workflow.now().timestamp()],
                 )
 
-            await workflow.sleep(timedelta(minutes=1))
+            await workflow.sleep(timedelta(minutes=3))

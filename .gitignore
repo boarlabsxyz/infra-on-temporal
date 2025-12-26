@@ -7,3 +7,4 @@ __pycache__
 .dockerignore
 tg_session.session
 IMAGE_SUPPORT_README.md
+telegram_get_messeges_with_heartbeat.py

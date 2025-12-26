@@ -62,34 +62,14 @@ async def resend_message(info):
     payload = {
         "blocks": [
             {
-                "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": "✅ Approved Message",
-                    "emoji": True
-                }
-            },
-            {
-                "type": "divider"
-            },
-            {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
                     "text": message
                 }
             },
-            {
-                "type": "context",
-                "elements": [
-                    {
-                        "type": "mrkdwn",
-                        "text": "👍 _This message was approved with a reaction_"
-                    }
-                ]
-            }
         ],
-        "text": f"Approved: {message[:50]}..."  # Fallback text for notifications
+        "text": f"New message: {message[:50]}..."  # Fallback text for notifications
     }
 
     async with aiohttp.ClientSession() as session:

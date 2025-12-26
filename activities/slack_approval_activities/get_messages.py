@@ -10,7 +10,7 @@ load_dotenv()
 client = WebClient(token=os.getenv("SLACK_TOKEN"))
 
 @activity.defn
-async def get_messages(channel_id: str, limit: int = 10) -> List[str]:
+async def get_messages(channel_id: str, limit: int = 15) -> List[str]:
     """
     Fetches the last few messages from a Slack channel and returns their timestamps
     in chronological order (oldest to newest).
