@@ -58,8 +58,8 @@ Your task is to convert Telegram message text into Slack-compatible formatting a
 4. Translate the text to English if it is in another language. If it is already in English, return it as is.
 5. Preserve emojis and line breaks.
 6. Remove any unsupported Telegram-specific formatting.
-7. Output only the Slack-formatted and English-translated text. Do not include explanations.
-8. Remove all hashtags from the text.
+7. Remove all hashtags from the text.
+8. Output only the Slack-formatted and English-translated text. Do not include explanations.
 """
 
     message = client.messages.create(

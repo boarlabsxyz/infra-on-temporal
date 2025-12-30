@@ -1,5 +1,6 @@
 from telethon import TelegramClient
 from telethon.errors import RPCError
+from telethon.sessions import StringSession
 from temporalio import activity
 from typing import List, Dict, Any
 import os
@@ -11,6 +12,8 @@ load_dotenv()
 
 API_ID = int(os.getenv("TG_API_ID"))
 API_HASH = os.getenv("TG_API_HASH")
+TG_SESSION_STRING = os.getenv("TG_SESSION_SRING")
+
 
 
 @activity.defn
@@ -29,7 +32,7 @@ async def fetch_last_message(channel_username: str, limit: int = 10) -> List[Dic
     client = None
     
     try:
-        client = TelegramClient("tg_session", API_ID, API_HASH)
+        client = TelegramClient(StringSession(TG_SESSION_STRING), API_ID, API_HASH)
         await client.connect()
         
         if not await client.is_user_authorized():
