@@ -1,13 +1,8 @@
-.venv
-env
 .env
 __pycache__
 .mypy_cache
-.DS_Store
 .dockerignore
 tg_session.session
 IMAGE_SUPPORT_README.md
-telegram_get_messeges_with_heartbeat.py
 tests
 __init__.py
-tg_session.b64

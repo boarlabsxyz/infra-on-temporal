@@ -1,23 +1,16 @@
 # save_session.py
-import asyncio
-import os
 from telethon import TelegramClient
-from telethon.sessions import StringSession
+import os
 from dotenv import load_dotenv
-
 load_dotenv()
 
-api_id = int(os.environ["TG_API_ID"])
-api_hash = os.environ["TG_API_HASH"]
+api_id = os.getenv("TG_API_ID")
+api_hash = os.getenv("TG_API_HASH")
+
+client = TelegramClient("tg_session", api_id, api_hash)
 
 async def main():
-    async with TelegramClient(
-        StringSession(),
-        api_id,
-        api_hash,
-    ) as client:
-        print("\n✅ Your session string:\n")
-        print(client.session.save())
+    await client.start()
+    print("Session saved!")
 
-if __name__ == "__main__":
-    asyncio.run(main())
+client.loop.run_until_complete(main())
