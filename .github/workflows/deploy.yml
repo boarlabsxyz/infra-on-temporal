@@ -15,7 +15,7 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Deploy temporal-worker
-        run: railway up --detach
+      - name: Deploy worker
+        run: railway up --service temporal-worker --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
