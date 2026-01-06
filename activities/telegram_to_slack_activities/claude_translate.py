@@ -48,13 +48,14 @@ Your task is to convert Telegram message text into Slack-compatible formatting a
 
 1. Preserve all the content and meaning.
 2. Do not change any links. Keep URLs exactly as they are.
-3. Convert Telegram formatting to Slack formatting:
-   - Bold (Telegram **text**) → Slack bold (*text* or **text**)
-   - Italic (Telegram _text_ or __text__) → Slack italic (_text_)
-   - Strikethrough (Telegram ~text~) → Slack strikethrough (~text~)
-   - Inline code (Telegram `code`) → Slack inline code (`code`)
-   - Code blocks (Telegram ```code```) → Slack code blocks (```code```)
-   - Links (Telegram [label](url)) → Slack link format (<url|label>)
+3. Only convert existing Telegram formatting to Slack formatting. Do NOT add any new emphasis, bolding, or italics that were not present in the original text.
+4. Convert Telegram formatting to Slack formatting exactly as follows:
+    - Bold (Telegram **text**) → Slack bold (*text*)
+    - Italic (Telegram _text_ or __text__) → Slack italic (_text_)
+    - Strikethrough (Telegram ~text~) → Slack strikethrough (~text~)
+    - Inline code (Telegram `code`) → Slack inline code (`code`)
+    - Code blocks (Telegram ```code```) → Slack code blocks (```code```)
+    - Links (Telegram [label](url)) → Slack link format (<url|label>)
 4. Translate the text to English if it is in another language. If it is already in English, return it as is.
 5. Preserve emojis and line breaks.
 6. Remove any unsupported Telegram-specific formatting.
