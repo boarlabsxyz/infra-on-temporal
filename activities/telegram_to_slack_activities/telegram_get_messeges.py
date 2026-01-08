@@ -17,7 +17,7 @@ TG_SESSION_STRING = os.getenv("TG_SESSION_SRING")
 
 
 @activity.defn
-async def fetch_last_message(channel_username: str, limit: int = 10) -> List[Dict[str, Any]]:
+async def fetch_last_message(channel_username: str, limit: int = 5) -> List[Dict[str, Any]]:
     """
     Fetches the last few messages from a Telegram channel and returns them
     in chronological order (oldest to newest).
