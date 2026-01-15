@@ -13,13 +13,37 @@ def format_telegram_to_slack(text: str) -> str:
     # Convert Telegram bold **text** to Slack bold *text*
     text = re.sub(r'\*\*(.+?)\*\*', r'*\1*', text)
 
-    # Convert Telegram links [label](url) to Slack <url|label>
-    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<\2|\1>', text)
+    # Extract and temporarily replace Telegram links to protect them during escaping
+    links = []
+    def save_link(match):
+        label = match.group(1)
+        url = match.group(2)
+        # Escape pipe characters in labels (would break Slack link format)
+        label = label.replace('|', '-')
+        links.append((url, label))
+        return f'\x00LINK{len(links)-1}\x00'
+
+    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', save_link, text)
+
+    # Escape special characters for Slack mrkdwn (must happen after link extraction)
+    text = text.replace('&', '&amp;')
+    text = text.replace('<', '&lt;')
+    text = text.replace('>', '&gt;')
+
+    # Restore links in Slack format
+    for i, (url, label) in enumerate(links):
+        text = text.replace(f'\x00LINK{i}\x00', f'<{url}|{label}>')
 
     # Italic, strikethrough, code blocks are the same in both formats
     # (no conversion needed)
 
-    return text.strip()
+    text = text.strip()
+
+    # Truncate to stay under Slack's 3000 char limit for section blocks (with buffer)
+    if len(text) > 2900:
+        text = text[:2900] + '... [truncated]'
+
+    return text
 
 api_key = os.getenv("ANTHROPIC_API_KEY")
 
