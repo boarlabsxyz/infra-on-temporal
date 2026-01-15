@@ -1,5 +1,6 @@
 from temporalio import activity
 import os
+import re
 import base64
 from dotenv import load_dotenv
 load_dotenv()
@@ -8,11 +9,46 @@ SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
 SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN") or os.getenv("SLACK_TOKEN")  # Support both variable names
 SLACK_CHANNEL_ID = os.getenv("SLACK_CHANNEL_ID")
 
+
+def escape_slack_mrkdwn(text: str, max_length: int = 2900) -> str:
+    """Escape special characters for Slack mrkdwn and truncate if needed."""
+    if not text:
+        return text
+
+    # Extract existing Slack-style links to protect them during escaping
+    links = []
+    def save_link(match):
+        links.append(match.group(0))
+        return f'\x00LINK{len(links)-1}\x00'
+
+    text = re.sub(r'<https?://[^|>]+\|[^>]+>', save_link, text)
+    text = re.sub(r'<https?://[^>]+>', save_link, text)
+
+    # Escape special characters for Slack mrkdwn
+    text = text.replace('&', '&amp;')
+    text = text.replace('<', '&lt;')
+    text = text.replace('>', '&gt;')
+
+    # Restore links
+    for i, link in enumerate(links):
+        text = text.replace(f'\x00LINK{i}\x00', link)
+
+    # Truncate to stay under Slack's 3000 char limit for section blocks
+    if len(text) > max_length:
+        text = text[:max_length] + '... [truncated]'
+
+    return text
+
+
 @activity.defn
 async def send_message_to_slack(info):
     import aiohttp
 
     message, channel, has_image, image_data, msg_id, original_text = info[0], info[1], info[2], info[3], info[4], info[5]
+
+    # Escape message and original_text for Slack mrkdwn
+    message = escape_slack_mrkdwn(message)
+    original_text = escape_slack_mrkdwn(original_text) if original_text else original_text
     
     # Create Telegram link (remove @ if present)
     channel_clean = channel.lstrip('@')
