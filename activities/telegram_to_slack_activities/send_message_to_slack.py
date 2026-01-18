@@ -3,6 +3,7 @@ import os
 import re
 import base64
 from dotenv import load_dotenv
+from .claude_translate import format_telegram_to_slack
 load_dotenv()
 
 SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
@@ -48,7 +49,7 @@ async def send_message_to_slack(info):
 
     # Escape message and original_text for Slack mrkdwn
     message = escape_slack_mrkdwn(message)
-    original_text = escape_slack_mrkdwn(original_text) if original_text else original_text
+    original_text = format_telegram_to_slack(original_text) if original_text else original_text
     
     # Create Telegram link (remove @ if present)
     channel_clean = channel.lstrip('@')
