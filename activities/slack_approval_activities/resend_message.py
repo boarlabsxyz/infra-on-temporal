@@ -23,36 +23,66 @@ async def resend_message(info):
         has_image = info.get("has_image", False)
         image_data = info.get("image_data")
 
-    # If there's an image and we have bot token and channel ID, use files.upload API
+    # If there's an image and we have bot token and channel ID, use new Slack files API
     if has_image and image_data and SLACK_BOT_TOKEN and SLACK_CHANNEL_ID_NEWS:
         try:
             # Decode base64 image
             image_bytes = base64.b64decode(image_data)
-            
+
             # Format the message nicely
             formatted_message = f"✅ *Approved Message*\n\n{message}"
-            
-            # Use Slack Web API to upload the file
-            form_data = aiohttp.FormData()
-            form_data.add_field('channels', SLACK_CHANNEL_ID_NEWS)
-            form_data.add_field('initial_comment', formatted_message)
-            form_data.add_field('file', 
-                              image_bytes,
-                              filename='approved_image.jpg',
-                              content_type='image/jpeg')
-            
+
             async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    'https://slack.com/api/files.upload',
-                    data=form_data,
+                # Step 1: Get upload URL from Slack
+                upload_url_resp = await session.get(
+                    'https://slack.com/api/files.getUploadURLExternal',
+                    params={
+                        'filename': 'approved_image.jpg',
+                        'length': len(image_bytes)
+                    },
                     headers={'Authorization': f'Bearer {SLACK_BOT_TOKEN}'}
-                ) as resp:
-                    result = await resp.json()
-                    if not result.get('ok'):
-                        raise RuntimeError(f"File upload failed: {result.get('error')}")
-                    
-                    activity.logger.info(f"Successfully uploaded approved message with image to Slack")
-                    return result
+                )
+                upload_url_result = await upload_url_resp.json()
+
+                if not upload_url_result.get('ok'):
+                    raise RuntimeError(f"Failed to get upload URL: {upload_url_result.get('error')}")
+
+                upload_url = upload_url_result['upload_url']
+                file_id = upload_url_result['file_id']
+
+                activity.logger.info(f"Got upload URL for file_id: {file_id}")
+
+                # Step 2: Upload the file to the provided URL
+                async with session.post(
+                    upload_url,
+                    data=image_bytes,
+                    headers={'Content-Type': 'application/octet-stream'}
+                ) as upload_resp:
+                    if upload_resp.status != 200:
+                        raise RuntimeError(f"File upload failed with status: {upload_resp.status}")
+
+                activity.logger.info(f"Uploaded file to Slack storage")
+
+                # Step 3: Complete the upload and share to channel
+                complete_resp = await session.post(
+                    'https://slack.com/api/files.completeUploadExternal',
+                    json={
+                        'files': [{'id': file_id, 'title': 'Approved Image'}],
+                        'channel_id': SLACK_CHANNEL_ID_NEWS,
+                        'initial_comment': formatted_message
+                    },
+                    headers={
+                        'Authorization': f'Bearer {SLACK_BOT_TOKEN}',
+                        'Content-Type': 'application/json'
+                    }
+                )
+                complete_result = await complete_resp.json()
+
+                if not complete_result.get('ok'):
+                    raise RuntimeError(f"Failed to complete upload: {complete_result.get('error')}")
+
+                activity.logger.info(f"Successfully uploaded approved message with image to Slack")
+                return complete_result
         except Exception as e:
             activity.logger.error(f"Failed to upload image, falling back to text only: {e}")
             # Fall back to webhook if image upload fails
