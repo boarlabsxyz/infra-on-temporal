@@ -55,75 +55,106 @@ async def send_message_to_slack(info):
     channel_clean = channel.lstrip('@')
     telegram_link = f"https://t.me/{channel_clean}/{msg_id}"
 
-    # If there's an image and we have bot token and channel ID, use files.upload API
+    # If there's an image and we have bot token and channel ID, use new Slack files API
     if has_image and image_data and SLACK_BOT_TOKEN and SLACK_CHANNEL_ID:
         try:
             # Decode base64 image
             image_bytes = base64.b64decode(image_data)
-            
+
             # Format the message nicely with link
             formatted_message = f"📱 *Telegram Channel:* `{channel}`\n<{telegram_link}|View original on Telegram>\n\n{message}"
-            
-            # Use Slack Web API to upload the file
-            form_data = aiohttp.FormData()
-            form_data.add_field('channels', SLACK_CHANNEL_ID)
-            form_data.add_field('initial_comment', formatted_message)
-            form_data.add_field('file', 
-                              image_bytes,
-                              filename='telegram_image.jpg',
-                              content_type='image/jpeg')
-            
+
             async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    'https://slack.com/api/files.upload',
-                    data=form_data,
+                # Step 1: Get upload URL from Slack
+                upload_url_resp = await session.get(
+                    'https://slack.com/api/files.getUploadURLExternal',
+                    params={
+                        'filename': 'telegram_image.jpg',
+                        'length': len(image_bytes)
+                    },
                     headers={'Authorization': f'Bearer {SLACK_BOT_TOKEN}'}
-                ) as resp:
-                    result = await resp.json()
-                    if not result.get('ok'):
-                        raise RuntimeError(f"File upload failed: {result.get('error')}")
-                    
-                    activity.logger.info(f"Successfully uploaded image to Slack")
-                    
-                    # Post original message in thread for comparison
-                    if original_text and result.get('file', {}).get('shares'):
-                        # Get the message timestamp from the file share
-                        shares = result['file']['shares']
-                        if 'private' in shares and SLACK_CHANNEL_ID in shares['private']:
-                            message_ts = shares['private'][SLACK_CHANNEL_ID][0]['ts']
-                        elif 'public' in shares and SLACK_CHANNEL_ID in shares['public']:
-                            message_ts = shares['public'][SLACK_CHANNEL_ID][0]['ts']
-                        else:
-                            message_ts = None
-                        
-                        if message_ts:
-                            thread_payload = {
-                                "channel": SLACK_CHANNEL_ID,
-                                "thread_ts": message_ts,
-                                "text": f"📝 *Original message:*\n\n{original_text}",
-                                "blocks": [
-                                    {
-                                        "type": "section",
-                                        "text": {
-                                            "type": "mrkdwn",
-                                            "text": f"📝 *Original message:*\n\n{original_text}"
-                                        }
+                )
+                upload_url_result = await upload_url_resp.json()
+
+                if not upload_url_result.get('ok'):
+                    raise RuntimeError(f"Failed to get upload URL: {upload_url_result.get('error')}")
+
+                upload_url = upload_url_result['upload_url']
+                file_id = upload_url_result['file_id']
+
+                activity.logger.info(f"Got upload URL for file_id: {file_id}")
+
+                # Step 2: Upload the file to the provided URL
+                async with session.post(
+                    upload_url,
+                    data=image_bytes,
+                    headers={'Content-Type': 'application/octet-stream'}
+                ) as upload_resp:
+                    if upload_resp.status != 200:
+                        raise RuntimeError(f"File upload failed with status: {upload_resp.status}")
+
+                activity.logger.info(f"Uploaded file to Slack storage")
+
+                # Step 3: Complete the upload and share to channel
+                complete_resp = await session.post(
+                    'https://slack.com/api/files.completeUploadExternal',
+                    json={
+                        'files': [{'id': file_id, 'title': 'Telegram Image'}],
+                        'channel_id': SLACK_CHANNEL_ID,
+                        'initial_comment': formatted_message
+                    },
+                    headers={
+                        'Authorization': f'Bearer {SLACK_BOT_TOKEN}',
+                        'Content-Type': 'application/json'
+                    }
+                )
+                complete_result = await complete_resp.json()
+
+                if not complete_result.get('ok'):
+                    raise RuntimeError(f"Failed to complete upload: {complete_result.get('error')}")
+
+                activity.logger.info(f"Successfully uploaded image to Slack")
+
+                # Post original message in thread for comparison
+                if original_text and complete_result.get('files'):
+                    # Get the message timestamp from the file share
+                    file_info = complete_result['files'][0]
+                    shares = file_info.get('shares', {})
+                    message_ts = None
+
+                    if 'private' in shares and SLACK_CHANNEL_ID in shares['private']:
+                        message_ts = shares['private'][SLACK_CHANNEL_ID][0]['ts']
+                    elif 'public' in shares and SLACK_CHANNEL_ID in shares['public']:
+                        message_ts = shares['public'][SLACK_CHANNEL_ID][0]['ts']
+
+                    if message_ts:
+                        thread_payload = {
+                            "channel": SLACK_CHANNEL_ID,
+                            "thread_ts": message_ts,
+                            "text": f"📝 *Original message:*\n\n{original_text}",
+                            "blocks": [
+                                {
+                                    "type": "section",
+                                    "text": {
+                                        "type": "mrkdwn",
+                                        "text": f"📝 *Original message:*\n\n{original_text}"
                                     }
-                                ]
-                            }
-                            
-                            async with session.post(
-                                'https://slack.com/api/chat.postMessage',
-                                json=thread_payload,
-                                headers={'Authorization': f'Bearer {SLACK_BOT_TOKEN}'}
-                            ) as thread_resp:
-                                thread_result = await thread_resp.json()
-                                if not thread_result.get('ok'):
-                                    activity.logger.error(f"Thread post failed: {thread_result.get('error')}")
-                                else:
-                                    activity.logger.info(f"Successfully posted original message in thread")
-                    
-                    return result
+                                }
+                            ]
+                        }
+
+                        async with session.post(
+                            'https://slack.com/api/chat.postMessage',
+                            json=thread_payload,
+                            headers={'Authorization': f'Bearer {SLACK_BOT_TOKEN}'}
+                        ) as thread_resp:
+                            thread_result = await thread_resp.json()
+                            if not thread_result.get('ok'):
+                                activity.logger.error(f"Thread post failed: {thread_result.get('error')}")
+                            else:
+                                activity.logger.info(f"Successfully posted original message in thread")
+
+                return complete_result
         except Exception as e:
             activity.logger.error(f"Failed to upload image, falling back to text only: {e}")
             # Fall back to webhook if image upload fails
