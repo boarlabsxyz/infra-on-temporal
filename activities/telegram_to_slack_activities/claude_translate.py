@@ -13,6 +13,9 @@ def format_telegram_to_slack(text: str) -> str:
     # Convert Telegram bold **text** to Slack bold *text*
     text = re.sub(r'\*\*(.+?)\*\*', r'*\1*', text)
 
+    # Convert Telegram strikethrough ~~text~~ to Slack strikethrough ~text~
+    text = re.sub(r'~~(.+?)~~', r'~\1~', text)
+
     # Extract and temporarily replace Telegram links to protect them during escaping
     links = []
     def save_link(match):
@@ -34,8 +37,7 @@ def format_telegram_to_slack(text: str) -> str:
     for i, (url, label) in enumerate(links):
         text = text.replace(f'\x00LINK{i}\x00', f'<{url}|{label}>')
 
-    # Italic, strikethrough, code blocks are the same in both formats
-    # (no conversion needed)
+    # Italic and code blocks are the same in both formats (no conversion needed)
 
     text = text.strip()
 

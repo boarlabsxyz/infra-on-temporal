@@ -1,4 +1,5 @@
 from temporalio import activity
+import asyncio
 import os
 import re
 import base64
@@ -114,20 +115,47 @@ async def send_message_to_slack(info):
                     raise RuntimeError(f"Failed to complete upload: {complete_result.get('error')}")
 
                 activity.logger.info(f"Successfully uploaded image to Slack")
+                activity.logger.info(f"Complete upload response: {complete_result}")
 
                 # Post original message in thread for comparison
-                if original_text and complete_result.get('files'):
-                    # Get the message timestamp from the file share
-                    file_info = complete_result['files'][0]
-                    shares = file_info.get('shares', {})
-                    message_ts = None
+                activity.logger.info(f"original_text is: {bool(original_text)}, length: {len(original_text) if original_text else 0}")
+                if original_text:
+                    uploaded_file_id = complete_result['files'][0].get('id')
+                    activity.logger.info(f"Uploaded file_id: {uploaded_file_id}")
+                    await asyncio.sleep(1)  # Brief delay for Slack to process
 
-                    if 'private' in shares and SLACK_CHANNEL_ID in shares['private']:
-                        message_ts = shares['private'][SLACK_CHANNEL_ID][0]['ts']
-                    elif 'public' in shares and SLACK_CHANNEL_ID in shares['public']:
-                        message_ts = shares['public'][SLACK_CHANNEL_ID][0]['ts']
+                    # Get recent messages and find the one with our file
+                    async with session.get(
+                        'https://slack.com/api/conversations.history',
+                        params={'channel': SLACK_CHANNEL_ID, 'limit': 10},
+                        headers={'Authorization': f'Bearer {SLACK_BOT_TOKEN}'}
+                    ) as history_resp:
+                        history_result = await history_resp.json()
+                        activity.logger.info(f"conversations.history ok: {history_result.get('ok')}")
+
+                        message_ts = None
+                        if history_result.get('ok') and history_result.get('messages'):
+                            activity.logger.info(f"Found {len(history_result['messages'])} messages")
+                            for i, msg in enumerate(history_result['messages']):
+                                msg_files = msg.get('files', [])
+                                msg_ts = msg.get('ts')
+                                msg_subtype = msg.get('subtype', 'none')
+                                activity.logger.info(f"Message {i}: ts={msg_ts}, subtype={msg_subtype}, files_count={len(msg_files)}")
+                                if msg_files:
+                                    for f in msg_files:
+                                        activity.logger.info(f"  File id: {f.get('id')}")
+                                        if f.get('id') == uploaded_file_id:
+                                            message_ts = msg_ts
+                                            activity.logger.info(f"Found matching message with ts: {message_ts}")
+                                            break
+                                if message_ts:
+                                    break
+
+                    if not message_ts:
+                        activity.logger.warning(f"Could not find message with file_id {uploaded_file_id}")
 
                     if message_ts:
+                        activity.logger.info(f"Posting thread reply with message_ts: {message_ts}")
                         thread_payload = {
                             "channel": SLACK_CHANNEL_ID,
                             "thread_ts": message_ts,
