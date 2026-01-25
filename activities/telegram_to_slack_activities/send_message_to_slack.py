@@ -122,37 +122,41 @@ async def send_message_to_slack(info):
                 if original_text:
                     uploaded_file_id = complete_result['files'][0].get('id')
                     activity.logger.info(f"Uploaded file_id: {uploaded_file_id}")
-                    await asyncio.sleep(1)  # Brief delay for Slack to process
 
-                    # Get recent messages and find the one with our file
-                    async with session.get(
-                        'https://slack.com/api/conversations.history',
-                        params={'channel': SLACK_CHANNEL_ID, 'limit': 10},
-                        headers={'Authorization': f'Bearer {SLACK_BOT_TOKEN}'}
-                    ) as history_resp:
-                        history_result = await history_resp.json()
-                        activity.logger.info(f"conversations.history ok: {history_result.get('ok')}")
+                    # Use files.info API with retries to get message_ts from shares
+                    message_ts = None
+                    for attempt in range(5):
+                        await asyncio.sleep(1)
+                        async with session.get(
+                            'https://slack.com/api/files.info',
+                            params={'file': uploaded_file_id},
+                            headers={'Authorization': f'Bearer {SLACK_BOT_TOKEN}'}
+                        ) as file_info_resp:
+                            file_info_result = await file_info_resp.json()
+                            activity.logger.info(f"files.info attempt {attempt + 1}: {file_info_result}")
 
-                        message_ts = None
-                        if history_result.get('ok') and history_result.get('messages'):
-                            activity.logger.info(f"Found {len(history_result['messages'])} messages")
-                            for i, msg in enumerate(history_result['messages']):
-                                msg_files = msg.get('files', [])
-                                msg_ts = msg.get('ts')
-                                msg_subtype = msg.get('subtype', 'none')
-                                activity.logger.info(f"Message {i}: ts={msg_ts}, subtype={msg_subtype}, files_count={len(msg_files)}")
-                                if msg_files:
-                                    for f in msg_files:
-                                        activity.logger.info(f"  File id: {f.get('id')}")
-                                        if f.get('id') == uploaded_file_id:
-                                            message_ts = msg_ts
-                                            activity.logger.info(f"Found matching message with ts: {message_ts}")
-                                            break
-                                if message_ts:
-                                    break
+                            if file_info_result.get('ok') and file_info_result.get('file'):
+                                shares = file_info_result['file'].get('shares', {})
+                                activity.logger.info(f"Shares: {shares}")
+
+                                # Try to find message_ts in public or private shares
+                                for share_type in ['public', 'private']:
+                                    if share_type in shares:
+                                        for channel_id, share_list in shares[share_type].items():
+                                            if share_list and share_list[0].get('ts'):
+                                                message_ts = share_list[0]['ts']
+                                                activity.logger.info(f"Found ts {message_ts} in {share_type}/{channel_id}")
+                                                break
+                                    if message_ts:
+                                        break
+
+                            if message_ts:
+                                break
+
+                        activity.logger.info(f"Attempt {attempt + 1}: shares not ready yet")
 
                     if not message_ts:
-                        activity.logger.warning(f"Could not find message with file_id {uploaded_file_id}")
+                        activity.logger.warning(f"Could not get message_ts from files.info after 5 attempts")
 
                     if message_ts:
                         activity.logger.info(f"Posting thread reply with message_ts: {message_ts}")
