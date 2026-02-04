@@ -5,6 +5,48 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def cleanup_markdown(text: str) -> str:
+    """Clean up malformed markdown formatting."""
+    if not text:
+        return text
+
+    # First, convert valid **text** to *text* for Slack bold
+    text = re.sub(r'\*\*(.+?)\*\*', r'*\1*', text)
+
+    # Remove orphaned ** that don't have matching pairs
+    while True:
+        matches = list(re.finditer(r'\*\*', text))
+        if len(matches) % 2 == 0:
+            break
+        if matches:
+            last_match = matches[-1]
+            text = text[:last_match.start()] + text[last_match.end():]
+        else:
+            break
+
+    # Handle single asterisks per line
+    # Valid bold: *text* where text starts and ends with non-whitespace
+    lines = text.split('\n')
+    cleaned_lines = []
+    for line in lines:
+        # Check if line has valid *text* patterns only
+        # Valid: *word* or *multiple words* (no space after * or before *)
+        test_line = line
+        # Remove all valid *text* patterns
+        test_line = re.sub(r'\*\S[^*]*\S\*', '', test_line)
+        test_line = re.sub(r'\*\S\*', '', test_line)  # Single char like *a*
+
+        # If there are still asterisks, the line has invalid formatting
+        if '*' in test_line:
+            # Remove all asterisks from the original line
+            line = line.replace('*', '')
+
+        cleaned_lines.append(line)
+
+    text = '\n'.join(cleaned_lines)
+    return text
+
+
 def format_telegram_to_slack(text: str) -> str:
     """Convert Telegram formatting to Slack formatting using regex."""
     # Remove hashtags
@@ -108,4 +150,5 @@ Translate the provided text to English if it is not already in English. Follow t
         ]
     )
 
-    return message.content[0].text
+    # Clean up any malformed markdown from translation
+    return cleanup_markdown(message.content[0].text)
