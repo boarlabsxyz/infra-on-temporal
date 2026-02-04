@@ -1,13 +1,16 @@
 from slack_sdk import WebClient
 from temporalio import activity
 import os
-import aiohttp
 import base64
+import urllib.request
 
 from dotenv import load_dotenv
 load_dotenv()
 
-client = WebClient(token=os.getenv("SLACK_TOKEN"))
+SLACK_TOKEN = os.getenv("SLACK_TOKEN")
+SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN") or SLACK_TOKEN
+
+client = WebClient(token=SLACK_TOKEN)
 
 @activity.defn
 async def check_reactions(info):
@@ -24,16 +27,23 @@ async def check_reactions(info):
     if not msg_res["messages"]:
         return {"ts": ts, "error": "message_not_found"}
 
+    # Get the full message from conversations_history (includes files)
+    full_message = msg_res["messages"][0]
+
     react_res = client.reactions_get(
         channel=channel_id,
         timestamp=ts,
     )
 
     msg_with_reactions = react_res.get("message", {})
-    
+
+    # Use files from full_message as reactions_get may not include them
+    if "files" not in msg_with_reactions and "files" in full_message:
+        msg_with_reactions["files"] = full_message["files"]
+
     # Extract text - handle both plain text and Block Kit messages
     message_text = msg_with_reactions.get("text", "")
-    
+
     # If text is empty or looks like a fallback, try to extract from blocks
     if not message_text or message_text.startswith("New message from"):
         blocks = msg_with_reactions.get("blocks", [])
@@ -45,30 +55,30 @@ async def check_reactions(info):
                     if extracted_text and not extracted_text.startswith("New message from"):
                         message_text = extracted_text
                         break
-    
+
     # Check for files/images in the message
     files = msg_with_reactions.get("files", [])
     has_image = False
     image_data = None
-    image_url = None
-    
+
     if files:
         for file in files:
             # Check if it's an image
             if file.get("mimetype", "").startswith("image/"):
                 has_image = True
-                image_url = file.get("url_private")
-                
+                image_url = file.get("url_private_download") or file.get("url_private")
+
                 # Download the image if we have a URL
                 if image_url:
                     try:
-                        async with aiohttp.ClientSession() as session:
-                            headers = {"Authorization": f"Bearer {os.getenv('SLACK_TOKEN')}"}
-                            async with session.get(image_url, headers=headers) as resp:
-                                if resp.status == 200:
-                                    image_bytes = await resp.read()
-                                    image_data = base64.b64encode(image_bytes).decode('utf-8')
-                                    activity.logger.info(f"Downloaded image from message {ts}")
+                        req = urllib.request.Request(
+                            image_url,
+                            headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"}
+                        )
+                        with urllib.request.urlopen(req) as response:
+                            image_bytes = response.read()
+                            image_data = base64.b64encode(image_bytes).decode('utf-8')
+                            activity.logger.info(f"Downloaded image from message {ts}")
                     except Exception as e:
                         activity.logger.error(f"Failed to download image: {e}")
                 break  # Only handle the first image

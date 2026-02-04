@@ -1,5 +1,6 @@
 from temporalio import activity
 import os
+import re
 import base64
 
 from dotenv import load_dotenv
@@ -8,6 +9,47 @@ load_dotenv()
 SLACK_WEBHOOK_URL2 = os.getenv("SLACK_WEBHOOK_URL_NEWS")
 SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
 SLACK_CHANNEL_ID_NEWS = os.getenv("SLACK_CHANNEL_ID_NEWS")
+
+
+def extract_content_only(text: str) -> str:
+    """Extract only the message content, removing metadata lines."""
+    if not text:
+        return text
+
+    lines = text.split('\n')
+    content_lines = []
+    skip_next_empty = False
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Skip "Telegram Channel:" line (with or without emoji, any channel name)
+        if re.search(r'Telegram Channel:', stripped, re.IGNORECASE):
+            skip_next_empty = True
+            continue
+        # Skip "View original" link line (including Slack link format <url|text>)
+        if re.search(r'View original', stripped, re.IGNORECASE):
+            skip_next_empty = True
+            continue
+        # Skip "Approved Message" line
+        if re.search(r'Approved Message', stripped, re.IGNORECASE):
+            skip_next_empty = True
+            continue
+        # Skip empty lines right after metadata
+        if skip_next_empty and stripped == '':
+            skip_next_empty = False
+            continue
+        skip_next_empty = False
+        content_lines.append(line)
+
+    # Remove leading/trailing empty lines
+    while content_lines and content_lines[0].strip() == '':
+        content_lines.pop(0)
+    while content_lines and content_lines[-1].strip() == '':
+        content_lines.pop()
+
+    return '\n'.join(content_lines)
+
 
 @activity.defn
 async def resend_message(info):
@@ -23,21 +65,21 @@ async def resend_message(info):
         has_image = info.get("has_image", False)
         image_data = info.get("image_data")
 
-    # If there's an image and we have bot token and channel ID, use new Slack files API
+    # Extract only the content, removing metadata lines
+    message = extract_content_only(message)
+
+    # If there's an image and we have bot token and channel ID, use Slack files API
     if has_image and image_data and SLACK_BOT_TOKEN and SLACK_CHANNEL_ID_NEWS:
         try:
             # Decode base64 image
             image_bytes = base64.b64decode(image_data)
-
-            # Format the message nicely
-            formatted_message = f"✅ *Approved Message*\n\n{message}"
 
             async with aiohttp.ClientSession() as session:
                 # Step 1: Get upload URL from Slack
                 upload_url_resp = await session.get(
                     'https://slack.com/api/files.getUploadURLExternal',
                     params={
-                        'filename': 'approved_image.jpg',
+                        'filename': 'image.jpg',
                         'length': len(image_bytes)
                     },
                     headers={'Authorization': f'Bearer {SLACK_BOT_TOKEN}'}
@@ -67,9 +109,9 @@ async def resend_message(info):
                 complete_resp = await session.post(
                     'https://slack.com/api/files.completeUploadExternal',
                     json={
-                        'files': [{'id': file_id, 'title': 'Approved Image'}],
+                        'files': [{'id': file_id, 'title': 'Image'}],
                         'channel_id': SLACK_CHANNEL_ID_NEWS,
-                        'initial_comment': formatted_message
+                        'initial_comment': message
                     },
                     headers={
                         'Authorization': f'Bearer {SLACK_BOT_TOKEN}',
@@ -81,14 +123,13 @@ async def resend_message(info):
                 if not complete_result.get('ok'):
                     raise RuntimeError(f"Failed to complete upload: {complete_result.get('error')}")
 
-                activity.logger.info(f"Successfully uploaded approved message with image to Slack")
+                activity.logger.info(f"Successfully uploaded message with image to Slack")
                 return complete_result
         except Exception as e:
             activity.logger.error(f"Failed to upload image, falling back to text only: {e}")
             # Fall back to webhook if image upload fails
 
-    # Standard webhook for text-only messages or fallback
-    # Using blocks for better formatting
+    # Send text-only via webhook (fallback or no image)
     payload = {
         "blocks": [
             {
