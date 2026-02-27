@@ -3,9 +3,10 @@ from temporalio.common import RetryPolicy
 from datetime import timedelta
 from typing import List, Optional
 
-from activities.slack_approval_activities.get_messages import get_messages
-from activities.slack_approval_activities.get_reactions import check_reactions
-from activities.slack_approval_activities.resend_message import resend_message
+with workflow.unsafe.imports_passed_through():
+    from activities.slack_approval_activities.get_messages import get_messages
+    from activities.slack_approval_activities.get_reactions import check_reactions
+    from activities.slack_approval_activities.resend_message import resend_message
 
 
 @workflow.defn
