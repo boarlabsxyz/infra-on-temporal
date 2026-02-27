@@ -1,11 +1,12 @@
 from datetime import timedelta
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-from typing import Dict, Optional
+from typing import Dict, List, Any, Optional
 
-from activities.telegram_to_slack_activities.telegram_get_messeges import fetch_last_message
-from activities.telegram_to_slack_activities.claude_translate import get_claude_answer_activity
-from activities.telegram_to_slack_activities.send_message_to_slack import send_message_to_slack
+with workflow.unsafe.imports_passed_through():
+    from activities.telegram_to_slack_activities.telegram_get_messeges import fetch_last_message
+    from activities.telegram_to_slack_activities.claude_translate import get_claude_answer_activity
+    from activities.telegram_to_slack_activities.send_message_to_slack import send_message_to_slack
 
 
 @workflow.defn
