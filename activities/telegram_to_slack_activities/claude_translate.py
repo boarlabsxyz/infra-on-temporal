@@ -61,6 +61,7 @@ def format_telegram_to_slack(text: str) -> str:
     # Extract and temporarily replace Telegram links to protect them during escaping
     links = []
     def save_link(match):
+        """Extract and store a markdown link, returning a placeholder token."""
         label = match.group(1)
         url = match.group(2)
         # Escape pipe characters in labels (would break Slack link format)
@@ -93,6 +94,7 @@ api_key = os.getenv("ANTHROPIC_API_KEY")
 
 @activity.defn
 async def get_claude_answer_activity(context: str) -> str:
+    """Validate message content with Claude and translate to English if valid."""
     from anthropic import Anthropic
     client = Anthropic(api_key=api_key)
 

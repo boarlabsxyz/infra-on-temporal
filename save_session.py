@@ -10,6 +10,7 @@ api_hash = os.getenv("TG_API_HASH")
 client = TelegramClient("tg_session", api_id, api_hash)
 
 async def main():
+    """Authenticate with Telegram and save the session file locally."""
     await client.start()
     print("Session saved!")
 

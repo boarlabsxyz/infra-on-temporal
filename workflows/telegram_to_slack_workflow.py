@@ -14,6 +14,7 @@ class TelegramMonitorWorkflow:
 
     @workflow.run
     async def run(self, pollstate):
+        """Poll Telegram channels, validate and translate messages, then forward to Slack."""
         channel_list = pollstate[0]
         last_ids = pollstate[1]
         started_at = pollstate[2]

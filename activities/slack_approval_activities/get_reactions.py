@@ -15,6 +15,7 @@ client = WebClient(token=SLACK_TOKEN)
 
 @activity.defn
 async def check_reactions(info):
+    """Fetch reactions and image data for a Slack message by timestamp."""
     ts, channel_id = info[0], info[1]
 
     msg_res = client.conversations_history(

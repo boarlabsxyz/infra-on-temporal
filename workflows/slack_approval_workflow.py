@@ -14,6 +14,7 @@ class PollSlackForReactionWorkflow:
 
     @workflow.run
     async def run(self, pollstate):
+        """Poll Slack for approved messages and resend them to the news channel."""
         channel_id = pollstate[0]
         resent = pollstate[1]
         started_at = pollstate[2]

@@ -54,6 +54,7 @@ def extract_content_only(text: str) -> str:
 
 @activity.defn
 async def resend_message(info):
+    """Resend an approved message to the news Slack channel with optional image."""
     import aiohttp
 
     # Handle both old format (string) and new format (dict with image data)

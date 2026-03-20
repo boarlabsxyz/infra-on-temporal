@@ -4,6 +4,7 @@ from temporalio.client import Client
 import time
 
 async def main():
+    """Start the Telegram monitor workflow on the Temporal server."""
     client = await Client.connect("localhost:7233")
 
     result = await client.start_workflow(

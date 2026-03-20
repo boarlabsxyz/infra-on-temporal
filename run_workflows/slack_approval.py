@@ -5,6 +5,7 @@ import time
 
 
 async def main():
+    """Start the Slack approval polling workflow on the Temporal server."""
     client = await Client.connect("localhost:7233")
 
 
