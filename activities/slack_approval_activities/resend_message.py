@@ -4,6 +4,7 @@ import re
 import base64
 
 from dotenv import load_dotenv
+from activities.image_store import get as image_store_get
 load_dotenv()
 
 SLACK_WEBHOOK_URL2 = os.getenv("SLACK_WEBHOOK_URL_NEWS")
@@ -53,6 +54,7 @@ def extract_content_only(text: str) -> str:
 
 @activity.defn
 async def resend_message(info):
+    """Resend an approved message to the news Slack channel with optional image."""
     import aiohttp
 
     # Handle both old format (string) and new format (dict with image data)
@@ -63,7 +65,8 @@ async def resend_message(info):
     else:
         message = info.get("text", "")
         has_image = info.get("has_image", False)
-        image_data = info.get("image_data")
+        image_key = info.get("image_data")
+        image_data = image_store_get(image_key) if has_image else None
 
     # Extract only the content, removing metadata lines
     message = extract_content_only(message)

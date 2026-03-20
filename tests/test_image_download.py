@@ -16,6 +16,7 @@ SLACK_CHANNEL_ID = os.getenv("SLACK_CHANNEL_ID")
 
 
 async def test_url(session, url, name, token):
+    """Test downloading an image from a given Slack URL and report success."""
     print(f"\n--- Testing {name} ---")
     print(f"URL: {url}")
     headers = {"Authorization": f"Bearer {token}"}
@@ -30,6 +31,7 @@ async def test_url(session, url, name, token):
 
 
 async def test_image_download():
+    """Find a recent Slack message with an image and test downloading it via various URLs."""
     print(f"SLACK_TOKEN set: {bool(SLACK_TOKEN)}")
     print(f"SLACK_BOT_TOKEN set: {bool(SLACK_BOT_TOKEN)}")
     print()

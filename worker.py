@@ -17,6 +17,7 @@ import os
 
 
 async def main():
+    """Connect to Temporal server and run the worker with all registered workflows and activities."""
     client = await Client.connect(os.getenv("TEMPORAL_ADDRESS", "localhost:7233"))
 
     worker = Worker(

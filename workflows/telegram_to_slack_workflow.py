@@ -14,6 +14,7 @@ class TelegramMonitorWorkflow:
 
     @workflow.run
     async def run(self, pollstate):
+        """Poll Telegram channels, validate and translate messages, then forward to Slack."""
         channel_list = pollstate[0]
         last_ids = pollstate[1]
         started_at = pollstate[2]
@@ -75,9 +76,9 @@ class TelegramMonitorWorkflow:
                     # Update last_ids after processing each message
                     last_ids[channel] = msg_id
 
-            # Continue as new after 30 minutes to prevent history size from exceeding limit
+            # Continue as new after 15 minutes to prevent history size from exceeding limit
             # This resets the workflow history while preserving state
-            if workflow.now().timestamp() - started_at >= 30 * 60:
+            if workflow.now().timestamp() - started_at >= 15 * 60:
                 await workflow.continue_as_new(
                     [channel_list,
                     last_ids,

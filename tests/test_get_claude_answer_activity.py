@@ -9,6 +9,7 @@ pytestmark = pytest.mark.asyncio
 
 
 def mock_anthropic_response(text: str):
+    """Create a mock Anthropic API response with the given text."""
     mock_msg = MagicMock()
     mock_msg.content = [MagicMock(text=text)]
     return mock_msg
@@ -16,6 +17,7 @@ def mock_anthropic_response(text: str):
 
 @patch("anthropic.Anthropic")
 async def test_invalid_message_is_filtered(mock_anthropic):
+    """Verify that messages flagged as INVALID by Claude return an empty string."""
     mock_client = MagicMock()
     mock_anthropic.return_value = mock_client
 
@@ -29,6 +31,7 @@ async def test_invalid_message_is_filtered(mock_anthropic):
 
 @patch("anthropic.Anthropic")
 async def test_valid_message_is_processed(mock_anthropic):
+    """Verify that valid messages are translated and returned with Slack formatting."""
     mock_client = MagicMock()
     mock_anthropic.return_value = mock_client
 

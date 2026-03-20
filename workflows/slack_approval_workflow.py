@@ -14,6 +14,7 @@ class PollSlackForReactionWorkflow:
 
     @workflow.run
     async def run(self, pollstate):
+        """Poll Slack for approved messages and resend them to the news channel."""
         channel_id = pollstate[0]
         resent = pollstate[1]
         started_at = pollstate[2]
@@ -64,7 +65,7 @@ class PollSlackForReactionWorkflow:
 
                 workflow.logger.info(f"Checked message {ts}")
 
-            if workflow.now().timestamp() - started_at >= 60 * 60:
+            if workflow.now().timestamp() - started_at >= 30 * 60:
                 await workflow.continue_as_new(
                     [channel_id,
                     resent,

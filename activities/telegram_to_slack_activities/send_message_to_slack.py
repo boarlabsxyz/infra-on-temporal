@@ -5,6 +5,7 @@ import re
 import base64
 from dotenv import load_dotenv
 from .claude_translate import format_telegram_to_slack
+from activities.image_store import get as image_store_get
 load_dotenv()
 
 SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
@@ -20,6 +21,7 @@ def escape_slack_mrkdwn(text: str, max_length: int = 2900) -> str:
     # Extract existing Slack-style links to protect them during escaping
     links = []
     def save_link(match):
+        """Extract and store a Slack-style link, returning a placeholder token."""
         links.append(match.group(0))
         return f'\x00LINK{len(links)-1}\x00'
 
@@ -44,9 +46,11 @@ def escape_slack_mrkdwn(text: str, max_length: int = 2900) -> str:
 
 @activity.defn
 async def send_message_to_slack(info):
+    """Send a translated message to Slack with optional image upload and thread reply."""
     import aiohttp
 
-    message, channel, has_image, image_data, msg_id, original_text = info[0], info[1], info[2], info[3], info[4], info[5]
+    message, channel, has_image, image_key, msg_id, original_text = info[0], info[1], info[2], info[3], info[4], info[5]
+    image_data = image_store_get(image_key) if has_image else None
 
     # Escape message and original_text for Slack mrkdwn
     message = escape_slack_mrkdwn(message)

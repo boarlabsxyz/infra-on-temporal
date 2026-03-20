@@ -4,7 +4,6 @@ __pycache__
 .dockerignore
 tg_session.session
 IMAGE_SUPPORT_README.md
-tests
 __init__.py
 .DS_Store
 .pytest_cache

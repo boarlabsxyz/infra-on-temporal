@@ -5,6 +5,7 @@ import base64
 import urllib.request
 
 from dotenv import load_dotenv
+from activities.image_store import put as image_store_put
 load_dotenv()
 
 SLACK_TOKEN = os.getenv("SLACK_TOKEN")
@@ -14,6 +15,7 @@ client = WebClient(token=SLACK_TOKEN)
 
 @activity.defn
 async def check_reactions(info):
+    """Fetch reactions and image data for a Slack message by timestamp."""
     ts, channel_id = info[0], info[1]
 
     msg_res = client.conversations_history(
@@ -77,7 +79,8 @@ async def check_reactions(info):
                         )
                         with urllib.request.urlopen(req) as response:
                             image_bytes = response.read()
-                            image_data = base64.b64encode(image_bytes).decode('utf-8')
+                            image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+                            image_data = image_store_put(image_base64)
                             activity.logger.info(f"Downloaded image from message {ts}")
                     except Exception as e:
                         activity.logger.error(f"Failed to download image: {e}")

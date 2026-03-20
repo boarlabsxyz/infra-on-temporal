@@ -7,6 +7,7 @@ import os
 import base64
 from io import BytesIO
 from dotenv import load_dotenv
+from activities.image_store import put as image_store_put
 
 load_dotenv()
 
@@ -66,7 +67,7 @@ async def fetch_last_message(channel_username: str, limit: int = 5) -> List[Dict
                     image_base64 = base64.b64encode(photo_bytes.read()).decode('utf-8')
                     
                     message_data["has_image"] = True
-                    message_data["image_data"] = image_base64
+                    message_data["image_data"] = image_store_put(image_base64)
                     
                     activity.logger.info(f"Downloaded image from message {msg.id}")
                 except Exception as e:
