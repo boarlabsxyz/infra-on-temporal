@@ -1,6 +1,6 @@
 temporalio
 python-dotenv
-telethon
+telethon>=1.36
 slack-sdk
 aiohttp
 anthropic
