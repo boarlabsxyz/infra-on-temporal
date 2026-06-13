@@ -18,6 +18,10 @@ def escape_slack_mrkdwn(text: str, max_length: int = 2900) -> str:
     if not text:
         return text
 
+    # Defensive: convert any leftover Markdown bold **text** → Slack bold *text*
+    # (re.DOTALL so multi-line bold also gets caught)
+    text = re.sub(r'\*\*(.+?)\*\*', r'*\1*', text, flags=re.DOTALL)
+
     # Extract existing Slack-style links to protect them during escaping
     links = []
     def save_link(match):
@@ -67,7 +71,7 @@ async def send_message_to_slack(info):
             image_bytes = base64.b64decode(image_data)
 
             # Format the message nicely with link
-            formatted_message = f"📱 *Telegram Channel:* `{channel}`\n<{telegram_link}|View original on Telegram>\n\n{message}"
+            formatted_message = f"*Telegram Channel:* `{channel}`\n<{telegram_link}|View original on Telegram>\n\n{message}"
 
             async with aiohttp.ClientSession() as session:
                 # Step 1: Get upload URL from Slack
@@ -208,7 +212,7 @@ async def send_message_to_slack(info):
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": f"📱 {channel}",
+                            "text": f"{channel}",
                             "emoji": True
                         }
                     },
@@ -298,7 +302,7 @@ async def send_message_to_slack(info):
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": f"📱 {channel}",
+                    "text": f"{channel}",
                     "emoji": True
                 }
             },
