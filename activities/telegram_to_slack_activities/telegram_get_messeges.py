@@ -100,11 +100,33 @@ async def fetch_last_message(channel_username: str, limit: int = 5) -> List[Dict
             if msg.photo:
                 try:
                     photo_bytes = BytesIO()
-                    await client.download_media(
-                        msg.photo,
-                        photo_bytes,
-                        progress_callback=heartbeat_progress,
-                    )
+
+                    stop_keepalive = asyncio.Event()
+
+                    async def _keepalive_heartbeat(msg_id: int = msg.id) -> None:
+                        while not stop_keepalive.is_set():
+                            try:
+                                activity.heartbeat({"phase": "download", "msg_id": msg_id})
+                            except Exception:
+                                pass
+                            try:
+                                await asyncio.wait_for(stop_keepalive.wait(), timeout=15)
+                            except asyncio.TimeoutError:
+                                pass
+
+                    keepalive_task = asyncio.create_task(_keepalive_heartbeat())
+                    try:
+                        await client.download_media(
+                            msg.photo,
+                            photo_bytes,
+                            progress_callback=heartbeat_progress,
+                        )
+                    finally:
+                        stop_keepalive.set()
+                        try:
+                            await keepalive_task
+                        except asyncio.CancelledError:
+                            pass
                     photo_bytes.seek(0)
 
                     image_base64 = base64.b64encode(photo_bytes.read()).decode("utf-8")
