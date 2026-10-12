@@ -3,4 +3,4 @@ python-dotenv
 telethon>=1.36
 slack-sdk
 aiohttp
-anthropic
+openai

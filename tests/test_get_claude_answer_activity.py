@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, AsyncMock, MagicMock
 
 from activities.telegram_to_slack_activities.claude_translate import (
     get_claude_answer_activity
@@ -8,35 +8,38 @@ from activities.telegram_to_slack_activities.claude_translate import (
 pytestmark = pytest.mark.asyncio
 
 
-def mock_anthropic_response(text: str):
-    """Create a mock Anthropic API response with the given text."""
-    mock_msg = MagicMock()
-    mock_msg.content = [MagicMock(text=text)]
-    return mock_msg
+def mock_openrouter_response(text: str):
+    """Create a mock OpenRouter (OpenAI-compatible) completion with the given text."""
+    mock_completion = MagicMock()
+    mock_completion.choices = [MagicMock(message=MagicMock(content=text))]
+    return mock_completion
 
 
-@patch("anthropic.Anthropic")
-async def test_invalid_message_is_filtered(mock_anthropic):
-    """Verify that messages flagged as INVALID by Claude return an empty string."""
+def mock_openrouter_client(*responses):
+    """Create a mock AsyncOpenAI client returning the given completions in order."""
     mock_client = MagicMock()
-    mock_anthropic.return_value = mock_client
+    mock_client.chat.completions.create = AsyncMock(side_effect=list(responses))
+    return mock_client
 
+
+@patch("openai.AsyncOpenAI")
+async def test_invalid_message_is_filtered(mock_openai):
+    """Verify that messages flagged as INVALID by the LLM return an empty string."""
     # Validation call → INVALID
-    mock_client.messages.create.return_value = mock_anthropic_response("INVALID")
+    mock_openai.return_value = mock_openrouter_client(
+        mock_openrouter_response("INVALID")
+    )
 
     result = await get_claude_answer_activity("Buy cheap crypto now!!!")
 
     assert result == ""
 
 
-@patch("anthropic.Anthropic")
-async def test_valid_message_is_processed(mock_anthropic):
+@patch("openai.AsyncOpenAI")
+async def test_valid_message_is_processed(mock_openai):
     """Verify that valid messages are translated and returned with Slack formatting."""
-    mock_client = MagicMock()
-    mock_anthropic.return_value = mock_client
-
-    validation_response = mock_anthropic_response("VALID")
-    formatted_response = mock_anthropic_response(
+    validation_response = mock_openrouter_response("VALID")
+    formatted_response = mock_openrouter_response(
        """*Quality Engineering Challenges in 2025 and What to Do About Them in 2026*
 New year, same old problems:zany_face:
 Over the next 3 days, we'll break down 1 problem at a time.
@@ -50,10 +53,10 @@ What to do:
 :bulb: Mini-experiment: 30 minutes to align on quality with the team — and you're already a step ahead."""
     )
 
-    mock_client.messages.create.side_effect = [
+    mock_openai.return_value = mock_openrouter_client(
         validation_response,
         formatted_response,
-    ]
+    )
 
     result = await get_claude_answer_activity(
         """**Quality Engineering Challenges in 2025 and What to Do About Them in 2026**

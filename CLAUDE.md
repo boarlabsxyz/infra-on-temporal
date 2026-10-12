@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Message routing and approval workflow system that monitors Telegram channels for messages, translates/filters them using Claude AI, and forwards to Slack. Also monitors Slack for approval reactions and resends approved messages to a news channel.
+Message routing and approval workflow system that monitors Telegram channels for messages, translates/filters them using an LLM via OpenRouter, and forwards to Slack. Also monitors Slack for approval reactions and resends approved messages to a news channel.
 
-**Stack:** Python 3.11, Temporal (workflow orchestration), Telethon (Telegram), Slack SDK, Anthropic Claude, PostgreSQL, Docker
+**Stack:** Python 3.11, Temporal (workflow orchestration), Telethon (Telegram), Slack SDK, OpenRouter (OpenAI-compatible LLM API), PostgreSQL, Docker
 
 ## Commands
 
@@ -82,7 +82,9 @@ Required in `.env`:
 - `SLACK_TOKEN`, `SLACK_BOT_TOKEN`, `SLACK_WEBHOOK_URL`, `SLACK_WEBHOOK_URL_NEWS`
 - `SLACK_CHANNEL_ID`, `SLACK_CHANNEL_ID_NEWS`
 - `TG_API_ID`, `TG_API_HASH`, `TG_SESSION_SRING` (note: typo is intentional, matches code)
-- `ANTHROPIC_API_KEY`
+- `OPENROUTER_API_KEY` (translation/validation LLM via OpenRouter)
+- `OPENROUTER_MODEL` (optional, default: `anthropic/claude-sonnet-4.5`)
+- `OPENROUTER_BASE_URL` (optional, default: `https://openrouter.ai/api/v1`)
 - `TEMPORAL_ADDRESS` (default: localhost:7233)
 
 ## Deployment
@@ -92,5 +94,5 @@ Railway.app deployment configured via `railway.json`. GitHub Actions workflow in
 ## Known Gotchas
 
 - `TG_SESSION_SRING` environment variable has a typo (missing 'T') - this is intentional, matches the code
-- Claude prompts are in the activity files (`claude_translate.py`) - modify carefully as they affect validation and translation quality
+- LLM prompts are in the activity files (`claude_translate.py`) - modify carefully as they affect validation and translation quality
 - Temporal UI at port 8080 for debugging workflow state and history
