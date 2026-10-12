@@ -90,15 +90,29 @@ def format_telegram_to_slack(text: str) -> str:
 
     return text
 
-api_key = os.getenv("ANTHROPIC_API_KEY")
+# LLM access goes through OpenRouter, which exposes an OpenAI-compatible API.
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-sonnet-4.5")
+
+
+async def ask_openrouter(client, prompt: str, max_tokens: int) -> str:
+    """Send a single-turn prompt to OpenRouter and return the text answer."""
+    completion = await client.chat.completions.create(
+        model=OPENROUTER_MODEL,
+        max_tokens=max_tokens,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return (completion.choices[0].message.content or "").strip()
+
 
 @activity.defn
 async def get_claude_answer_activity(context: str) -> str:
-    """Validate message content with Claude and translate to English if valid."""
-    from anthropic import Anthropic
-    client = Anthropic(api_key=api_key)
+    """Validate message content with an LLM and translate to English if valid."""
+    from openai import AsyncOpenAI
+    client = AsyncOpenAI(api_key=OPENROUTER_API_KEY, base_url=OPENROUTER_BASE_URL)
 
-    # Apply regex formatting before Claude processing
+    # Apply regex formatting before LLM processing
     formatted_context = format_telegram_to_slack(context)
 
     # First, check if the message is appropriate and relevant
@@ -116,15 +130,13 @@ Respond with ONLY one word:
 Be strict: only allow messages that are clearly about news, AI, technology, science, current events, or related professional topics.
 """
 
-    validation_message = client.messages.create(
-        model="claude-sonnet-4-5-20250929",
-        max_tokens=10,
-        messages=[
-            {"role": "user", "content": f"{validation_instructions}\n\nMessage to validate:\n{formatted_context}"}
-        ]
-    )
-
-    validation_result = validation_message.content[0].text.strip().upper()
+    validation_result = (
+        await ask_openrouter(
+            client,
+            f"{validation_instructions}\n\nMessage to validate:\n{formatted_context}",
+            max_tokens=10,
+        )
+    ).upper()
 
     # If message is invalid, return empty string to signal filtering
     if validation_result != "VALID":
@@ -144,13 +156,11 @@ Translate the provided text to English if it is not already in English. Follow t
 5. Output only the translated text. Do not include explanations.
 """
 
-    message = client.messages.create(
-        model="claude-sonnet-4-5-20250929",
+    translated = await ask_openrouter(
+        client,
+        f"{instructions}\n\n{formatted_context}",
         max_tokens=1000,
-        messages=[
-            {"role": "user", "content": f"{instructions}\n\n{formatted_context}"}
-        ]
     )
 
     # Clean up any malformed markdown from translation
-    return cleanup_markdown(message.content[0].text)
+    return cleanup_markdown(translated)
