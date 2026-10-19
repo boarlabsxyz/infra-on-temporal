@@ -1,6 +1,7 @@
 from datetime import timedelta
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+from temporalio.exceptions import ActivityError
 from typing import Dict, List, Any, Optional
 
 with workflow.unsafe.imports_passed_through():
@@ -24,17 +25,25 @@ class TelegramMonitorWorkflow:
                 last_saved_id = last_ids.get(channel, 0)
 
                 # Fetch last few messages (returns list in chronological order: oldest to newest)
-                messages = await workflow.execute_activity(
-                    fetch_last_message,
-                    channel,
-                    start_to_close_timeout=timedelta(minutes=5),
-                    heartbeat_timeout=timedelta(seconds=45),
-                    retry_policy=RetryPolicy(
-                        maximum_attempts=5,
-                        initial_interval=timedelta(seconds=2),
-                        maximum_interval=timedelta(seconds=30),
-                    ),
-                )
+                # A Telegram outage must not kill the monitor: skip the channel this cycle
+                # and try again on the next poll.
+                try:
+                    messages = await workflow.execute_activity(
+                        fetch_last_message,
+                        channel,
+                        start_to_close_timeout=timedelta(minutes=5),
+                        heartbeat_timeout=timedelta(seconds=45),
+                        retry_policy=RetryPolicy(
+                            maximum_attempts=5,
+                            initial_interval=timedelta(seconds=2),
+                            maximum_interval=timedelta(seconds=30),
+                        ),
+                    )
+                except ActivityError as e:
+                    workflow.logger.warning(
+                        f"Fetching {channel} failed after retries, skipping this cycle: {e.cause or e}"
+                    )
+                    continue
 
                 if not messages:
                     workflow.logger.info(f"No messages found in channel {channel}")
