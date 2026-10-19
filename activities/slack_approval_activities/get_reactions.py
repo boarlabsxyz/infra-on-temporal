@@ -1,47 +1,49 @@
-from slack_sdk import WebClient
 from temporalio import activity
-import os
 import base64
-import urllib.request
 
-from dotenv import load_dotenv
+import aiohttp
+from slack_sdk.errors import SlackApiError
+
 from activities.image_store import put as image_store_put
-load_dotenv()
+from activities.slack_approval_activities.slack_client import SLACK_BOT_TOKEN, client
 
-SLACK_TOKEN = os.getenv("SLACK_TOKEN")
-SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN") or SLACK_TOKEN
+APPROVE_REACTION = "white_check_mark"
 
-client = WebClient(token=SLACK_TOKEN)
 
 @activity.defn
 async def check_reactions(info):
     """Fetch reactions and image data for a Slack message by timestamp."""
     ts, channel_id = info[0], info[1]
 
-    msg_res = client.conversations_history(
-        channel=channel_id,
-        latest=ts,
-        oldest=ts,
-        inclusive=True,
-        limit=1,
+    try:
+        react_res = await client.reactions_get(
+            channel=channel_id,
+            timestamp=ts,
+            full=True,
+        )
+    except SlackApiError as e:
+        if e.response.get("error") == "message_not_found":
+            return {"ts": ts, "error": "message_not_found"}
+        activity.logger.error(f"Slack API error checking reactions on {ts}: {e.response.get('error')}")
+        raise
+
+    msg_with_reactions = dict(react_res.get("message", {}))
+
+    # conversations.history is the scarce call (Slack rate-limits it hard), so only
+    # use it to fill in files on an approved message that reactions.get left out.
+    is_approved = any(
+        r.get("name") == APPROVE_REACTION for r in msg_with_reactions.get("reactions", [])
     )
-
-    if not msg_res["messages"]:
-        return {"ts": ts, "error": "message_not_found"}
-
-    # Get the full message from conversations_history (includes files)
-    full_message = msg_res["messages"][0]
-
-    react_res = client.reactions_get(
-        channel=channel_id,
-        timestamp=ts,
-    )
-
-    msg_with_reactions = react_res.get("message", {})
-
-    # Use files from full_message as reactions_get may not include them
-    if "files" not in msg_with_reactions and "files" in full_message:
-        msg_with_reactions["files"] = full_message["files"]
+    if is_approved and "files" not in msg_with_reactions:
+        msg_res = await client.conversations_history(
+            channel=channel_id,
+            latest=ts,
+            oldest=ts,
+            inclusive=True,
+            limit=1,
+        )
+        if msg_res["messages"] and "files" in msg_res["messages"][0]:
+            msg_with_reactions["files"] = msg_res["messages"][0]["files"]
 
     # Extract text - handle both plain text and Block Kit messages
     message_text = msg_with_reactions.get("text", "")
@@ -73,15 +75,18 @@ async def check_reactions(info):
                 # Download the image if we have a URL
                 if image_url:
                     try:
-                        req = urllib.request.Request(
-                            image_url,
-                            headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"}
-                        )
-                        with urllib.request.urlopen(req) as response:
-                            image_bytes = response.read()
-                            image_base64 = base64.b64encode(image_bytes).decode('utf-8')
-                            image_data = image_store_put(image_base64)
-                            activity.logger.info(f"Downloaded image from message {ts}")
+                        async with aiohttp.ClientSession(
+                            timeout=aiohttp.ClientTimeout(total=30)
+                        ) as session:
+                            async with session.get(
+                                image_url,
+                                headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"},
+                            ) as response:
+                                response.raise_for_status()
+                                image_bytes = await response.read()
+                        image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+                        image_data = image_store_put(image_base64)
+                        activity.logger.info(f"Downloaded image from message {ts}")
                     except Exception as e:
                         activity.logger.error(f"Failed to download image: {e}")
                 break  # Only handle the first image

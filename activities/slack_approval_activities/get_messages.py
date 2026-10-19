@@ -1,13 +1,8 @@
-from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from typing import List
 from temporalio import activity
-import os
 
-from dotenv import load_dotenv
-load_dotenv()
-
-client = WebClient(token=os.getenv("SLACK_TOKEN"))
+from activities.slack_approval_activities.slack_client import client
 
 @activity.defn
 async def get_messages(channel_id: str, limit: int = 15) -> List[str]:
@@ -25,7 +20,7 @@ async def get_messages(channel_id: str, limit: int = 15) -> List[str]:
     try:
         # Fetch conversation history from Slack
         # Note: Slack API returns messages in reverse chronological order (newest first)
-        res = client.conversations_history(
+        res = await client.conversations_history(
             channel=channel_id,
             limit=limit
         )

@@ -1,5 +1,6 @@
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+from temporalio.exceptions import ActivityError
 from datetime import timedelta
 from typing import List, Optional
 
@@ -11,6 +12,14 @@ with workflow.unsafe.imports_passed_through():
 
 @workflow.defn
 class PollSlackForReactionWorkflow:
+    # Slack answers `ratelimited` with Retry-After of up to a minute, so attempts
+    # need room to wait it out and back off.
+    SLACK_TIMEOUT = timedelta(minutes=5)
+    SLACK_RETRY = RetryPolicy(
+        maximum_attempts=5,
+        initial_interval=timedelta(seconds=5),
+        maximum_interval=timedelta(seconds=60),
+    )
 
     @workflow.run
     async def run(self, pollstate):
@@ -20,23 +29,32 @@ class PollSlackForReactionWorkflow:
         started_at = pollstate[2]
 
         while True:
-            timestamps = await workflow.execute_activity(
-                get_messages,
-                channel_id,
-                schedule_to_close_timeout=timedelta(seconds=60),
-                retry_policy=RetryPolicy(maximum_attempts=5),
-            )
+            # A Slack failure must not kill the monitor: skip this poll and try the next.
+            try:
+                timestamps = await workflow.execute_activity(
+                    get_messages,
+                    channel_id,
+                    schedule_to_close_timeout=self.SLACK_TIMEOUT,
+                    retry_policy=self.SLACK_RETRY,
+                )
+            except ActivityError as e:
+                workflow.logger.warning(f"Fetching Slack messages failed, skipping this poll: {e.cause or e}")
+                timestamps = []
 
             for ts in timestamps:
                 if ts in resent:
                     continue
 
-                info = await workflow.execute_activity(
-                    check_reactions,
-                    [ts, channel_id],
-                    schedule_to_close_timeout=timedelta(seconds=60),
-                    retry_policy=RetryPolicy(maximum_attempts=5),
-                )
+                try:
+                    info = await workflow.execute_activity(
+                        check_reactions,
+                        [ts, channel_id],
+                        schedule_to_close_timeout=self.SLACK_TIMEOUT,
+                        retry_policy=self.SLACK_RETRY,
+                    )
+                except ActivityError as e:
+                    workflow.logger.warning(f"Checking reactions on {ts} failed, retrying next poll: {e.cause or e}")
+                    continue
 
                 has_checkmark = any(
                     r.get("name") == "white_check_mark"
@@ -51,12 +69,17 @@ class PollSlackForReactionWorkflow:
                         "image_data": info.get("image_data")
                     }
                     
-                    await workflow.execute_activity(
-                        resend_message,
-                        message_info,
-                        schedule_to_close_timeout=timedelta(seconds=60),
-                        retry_policy=RetryPolicy(maximum_attempts=5),
-                    )
+                    try:
+                        await workflow.execute_activity(
+                            resend_message,
+                            message_info,
+                            schedule_to_close_timeout=self.SLACK_TIMEOUT,
+                            retry_policy=self.SLACK_RETRY,
+                        )
+                    except ActivityError as e:
+                        # Not marked as resent, so the next poll tries again.
+                        workflow.logger.warning(f"Resending {ts} failed, retrying next poll: {e.cause or e}")
+                        continue
 
                     resent.append(ts)
 
